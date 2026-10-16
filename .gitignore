@@ -1,0 +1,43 @@
+# 工作数据（本地记录，不入库）
+.workbuddy/
+
+# 虚拟环境与缓存
+.venv/
+.venv-mcp/
+__pycache__/
+*.pyc
+node_modules/
+.electron-cache/
+
+# 本地真实配置（含密钥与服务器密码，不入库；模板见 *.example.json）
+.env
+models.json
+servers.json
+
+# 构建产物
+dist/
+build/
+release/
+
+# 运行时数据
+trace.jsonl
+audit.jsonl
+state.json
+agent_memory.json
+agent_audit.jsonl
+agent_trace.jsonl
+agent_node_trace.jsonl
+agentdesk_memory.json
+agentdesk_audit.jsonl
+agentdesk_trace.jsonl
+langgraph_checkpoints.sqlite*
+langgraph_mcp_checkpoints.sqlite*
+langgraph_memory_checkpoints.sqlite*
+
+# 测试临时目录
+tests/_tmp/
+
+# 系统文件
+.DS_Store
+*.log
+

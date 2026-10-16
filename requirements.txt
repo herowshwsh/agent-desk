@@ -1,0 +1,8 @@
+openai>=1.0.0
+python-dotenv>=1.0.0
+httpx>=0.23.0
+paramiko>=3.4.0
+mcp>=1.19.0,<3
+langgraph>=1.2.15
+langgraph-checkpoint-sqlite>=3.1.2
+

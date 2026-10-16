@@ -1,0 +1,47 @@
+{
+  "default": "server",
+  "modules": [
+    {
+      "id": "server",
+      "label": "服务器助手",
+      "hint": "查询服务器信息与运行状态",
+      "icon": "server",
+      "mode": "agent",
+      "show_trace": true,
+      "show_sessions": true,
+      "model_locked": false,
+      "welcome_title": "今天想让 Agent\n帮你完成什么？",
+      "welcome_subtitle": "连接你的服务器，查看系统状态和运行信息。",
+      "placeholder": "查询服务器信息，或描述你要执行的运维任务…",
+      "prompts": [
+        "查询我的服务器信息",
+        "查询服务器正在运行的服务",
+        "查询 PM2 当前运行的服务",
+        "查看服务器 CPU 和内存使用情况",
+        "查看服务器磁盘空间",
+        "当前服务器运行了多久？"
+      ]
+    },
+    {
+      "id": "chat",
+      "label": "自由聊天",
+      "hint": "和模型随便聊，不触碰服务器",
+      "icon": "chat",
+      "mode": "chat",
+      "show_trace": false,
+      "show_sessions": true,
+      "model_locked": false,
+      "allow_files": true,
+      "welcome_title": "想到什么\n就说什么。",
+      "welcome_subtitle": "想聊什么都可以，直接开始。",
+      "placeholder": "随便说点什么…",
+      "system_prompt": "你是 AgentDesk 的对话助手。用简洁、自然的中文回答，可以闲聊、写作、翻译、解释概念。用户提到服务器或运维操作时，说明这个模块不执行任何服务器动作，并建议他切到「服务器助手」。",
+      "prompts": [
+        "帮我把这段话改得更专业",
+        "解释一下什么是向量数据库",
+        "用一句话解释 CAP 定理",
+        "给我列一个三个月学习计划"
+      ]
+    }
+  ]
+}

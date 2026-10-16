@@ -1,0 +1,42 @@
+{
+  "name": "agent-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AgentDesk：本地运行的桌面 AI Agent 工作台（服务器助手 / 自由聊天）",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "desktop": "electron .",
+    "build:bridge": ".venv/bin/python -m PyInstaller --clean --noconfirm --onefile --console --name agentdesk_bridge run_agentdesk_bridge.py",
+    "build:app": "sh scripts/build-release.sh"
+  },
+  "devDependencies": {
+    "electron": "^24.8.8",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.agentdesk.app",
+    "productName": "Agent",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "renderer/**",
+      "electron/**",
+      "assets/**"
+    ],
+    "extraResources": [
+      { "from": "assets/Agent.icns", "to": "Agent.icns" },
+      { "from": "assets/icon.png", "to": "icon.png" },
+      { "from": "dist/agentdesk_bridge", "to": "agentdesk_bridge" },
+      "modules.json",
+      "models.example.json",
+      "servers.example.json"
+    ],
+    "mac": {
+      "icon": "assets/Agent.icns",
+      "category": "public.app-category.productivity",
+      "target": "dir",
+      "identity": null
+    }
+  }
+}

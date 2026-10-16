@@ -1,0 +1,14 @@
+{
+  "default": "server-1",
+  "servers": [
+    {
+      "id": "server-1",
+      "label": "我的服务器",
+      "host": "",
+      "port": 22,
+      "username": "root",
+      "password": "",
+      "connect_timeout": 10
+    }
+  ]
+}
