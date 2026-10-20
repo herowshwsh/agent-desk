@@ -41,13 +41,15 @@ class StubCompletions:
             recorder["path"] = "agent_answer"
             recorder["history_len"] = len(messages) - 2
             return _stream_or_not(kwargs, "MODE=agent")
-        # 工具注册表流程：第一轮带 tools 且还没有工具结果 → 返回 get_system_info 调用；
-        # 已有工具结果 → 总结轮。
+        # 工具注册表流程（仅 agent 模式）：第一轮带 tools 且还没有工具结果 → 返回 get_system_info 调用；
+        # 已有工具结果 → 总结轮。chat 模块即使挂了只读工具，这里也按纯转发处理，
+        # 工具调用链路由单元测试覆盖。
+        is_agent_turn = "服务器助手，通过工具查询和维护用户的服务器" in system
         has_tool_result = any(m.get("role") in ("tool", "tool_calls", "tool_result") for m in messages)
-        if kwargs.get("tools") and not has_tool_result:
+        if is_agent_turn and kwargs.get("tools") and not has_tool_result:
             recorder["path"] = "router"
             return _tool_call_stream()
-        if has_tool_result:
+        if is_agent_turn and has_tool_result:
             recorder["path"] = "agent_answer"
             return _stream_or_not(kwargs, "MODE=agent")
         recorder["path"] = "chat"

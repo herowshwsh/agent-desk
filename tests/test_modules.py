@@ -1138,6 +1138,69 @@ class HistoryMessageTests(unittest.TestCase):
         self.assertEqual(messages[-1]["content"], "消息29", "保留最近的")
 
 
+class ChatServerToolTests(unittest.TestCase):
+    """自由聊天也能查服务器：allow_server 开关 + 只读工具 + 工具调用链路。"""
+
+    def test_module_flag_parsed(self):
+        with settings_from({"modules": [dict(CHAT_ONLY, allow_server=True)]}) as settings:
+            self.assertTrue(settings.modules[0].allow_server)
+        with settings_from({"modules": [CHAT_ONLY]}) as settings:
+            self.assertFalse(settings.modules[0].allow_server, "默认关闭")
+
+    def test_readonly_schemas_exclude_write(self):
+        from agentdesk_core.tool_registry import to_chat_tool_schemas
+
+        names = [item["function"]["name"] for item in to_chat_tool_schemas(read_only_only=True)]
+        self.assertIn("get_system_info", names)
+        self.assertIn("get_services", names)
+        self.assertNotIn("manage_pm2_process", names, "写操作不给无确认流程的模块")
+
+    def test_chat_module_calls_server_tool(self):
+        from agentdesk_core.agent import AgentDesk
+
+        settings = MagicMock(
+            model_api_key="k", model_base_url="", model_name="m1",
+            model_wire_api="chat", model_reasoning_effort="", model_store=True,
+            trace_file=Path("trace.jsonl"), audit_file=Path("audit.jsonl"),
+            state_file=Path("state.json"),
+            server_host="", server_username="", server_password="",
+            server_port=22, server_connect_timeout=5, request_timeout=45,
+            server_catalog={"default": "s1", "servers": [
+                {"id": "s1", "host": "127.0.0.1", "port": 22, "username": "root",
+                 "password": "pw", "connect_timeout": 1}]},
+        )
+        agent = AgentDesk(settings)
+        agent.server = MagicMock()
+        agent.server.query.return_value = {"ok": True, "data": {"主机名": "prod-srv"}}
+        module = MagicMock(id="chat", mode="chat", allow_files=False, allow_server=True, system_prompt="助手")
+        calls = [
+            {"content": "", "tool_calls": [{"id": "c1", "name": "get_system_info", "arguments": "{}"}], "ttfb_ms": 1},
+            {"content": "服务器主机名是 prod-srv", "tool_calls": [], "ttfb_ms": 1},
+        ]
+        with patch.object(agent, "_completion", side_effect=calls):
+            answer = agent.run_chat("看下服务器", module, [], is_cancelled=lambda: False)
+        agent.server.query.assert_called_once()
+        self.assertIn("prod-srv", answer)
+
+    def test_chat_module_without_flag_has_no_tools(self):
+        from agentdesk_core.agent import AgentDesk
+
+        settings = MagicMock(
+            model_api_key="k", model_base_url="", model_name="m1",
+            model_wire_api="chat", model_reasoning_effort="", model_store=True,
+            trace_file=Path("trace.jsonl"), audit_file=Path("audit.jsonl"),
+            state_file=Path("state.json"),
+            server_host="", server_username="", server_password="",
+            server_port=22, server_connect_timeout=5, request_timeout=45,
+            server_catalog={"default": "s1", "servers": []},
+        )
+        agent = AgentDesk(settings)
+        module = MagicMock(id="chat", mode="chat", allow_files=False, allow_server=False, system_prompt="助手")
+        with patch.object(agent, "_completion", return_value={"content": "普通回答", "tool_calls": [], "ttfb_ms": 1}) as completion:
+            agent.run_chat("随便聊", module, [], is_cancelled=lambda: False)
+        self.assertIsNone(completion.call_args.kwargs.get("tools"), "未开启时不应带工具")
+
+
 class ServerStoreTests(unittest.TestCase):
     """服务器管理：宽松校验 + 密码草稿覆盖 + 回显不带密码。"""
 

@@ -60,8 +60,11 @@ SERVER_TOOLS_BY_NAME = {spec.name: spec for spec in SERVER_TOOLS}
 OPERATION_TO_ACTION = {"start": "pm2_start", "stop": "pm2_stop", "restart": "pm2_restart"}
 
 
-def to_chat_tool_schemas() -> list[Dict[str, Any]]:
-    """转成 chat completions 的 tools 格式；responses 的扁平转换由统一调用层处理。"""
+def to_chat_tool_schemas(read_only_only: bool = False) -> list[Dict[str, Any]]:
+    """转成 chat completions 的 tools 格式；responses 的扁平转换由统一调用层处理。
+
+    read_only_only=True 时只返回只读查询工具（无确认流程的模块用）。
+    """
     return [
         {
             "type": "function",
@@ -72,4 +75,5 @@ def to_chat_tool_schemas() -> list[Dict[str, Any]]:
             },
         }
         for spec in SERVER_TOOLS
+        if not read_only_only or spec.read_only
     ]

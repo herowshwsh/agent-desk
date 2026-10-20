@@ -97,6 +97,7 @@ class ModuleSpec:
     placeholder: str
     prompts: tuple[str, ...]
     system_prompt: str
+    allow_server: bool = False
 
 
 @dataclass(frozen=True)
@@ -193,6 +194,7 @@ def _load_modules(path: Path) -> tuple[tuple[ModuleSpec, ...], str]:
                 show_sessions=_as_bool(entry.get("show_sessions"), True),
                 model_locked=_as_bool(entry.get("model_locked"), False),
                 allow_files=_as_bool(entry.get("allow_files"), False),
+                allow_server=_as_bool(entry.get("allow_server"), False),
                 welcome_title=str(entry.get("welcome_title", "")).strip(),
                 welcome_subtitle=str(entry.get("welcome_subtitle", "")).strip(),
                 placeholder=str(entry.get("placeholder", "")).strip(),

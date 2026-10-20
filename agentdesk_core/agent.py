@@ -2,6 +2,7 @@
 
 import json
 import time
+from datetime import datetime
 from pathlib import Path
 
 import httpx
@@ -24,6 +25,18 @@ WRITE_ACTIONS = {"pm2_start", "pm2_stop", "pm2_restart"}
 CHAT_HISTORY_LIMIT = 12
 CHAT_TOOL_ROUNDS = 4
 SERVER_TOOL_ROUNDS = 3
+_WEEKDAYS = "一二三四五六日"
+
+
+def time_context() -> str:
+    """把当前日期/时间注入系统提示——模型本身没有时钟，不注入就答不出"今天周几"。"""
+    now = datetime.now()
+    return (
+        f"当前时间：{now:%Y-%m-%d %H:%M}（星期{_WEEKDAYS[now.weekday()]}，本机时区）。"
+        "涉及日期、星期、几点等时间问题时，直接以此为准回答，不要声称无法获取实时日期。"
+    )
+
+
 TURN_SYSTEM_PROMPT = (
     "你是 AgentDesk 的服务器助手，通过工具查询和维护用户的服务器。"
     "根据用户的问题选择合适的工具；没有合适工具时直接用已有知识回答，并说明这是无法通过工具核实的一般性回答。"
@@ -493,7 +506,19 @@ class AgentDesk:
         started = time.perf_counter()
         cancelled = is_cancelled or (lambda: False)
         trace: Dict[str, Any] = {"module": module.id, "mode": "chat", "question_length": len(question)}
-        system_prompt = module.system_prompt or "你是一个乐于助人的对话助手。"
+        system_prompt = (
+            f"{time_context()}\n\n"
+            + (module.system_prompt or "你是一个乐于助人的对话助手。")
+        )
+        allow_server = bool(getattr(module, "allow_server", False))
+        if allow_server:
+            system_prompt += (
+                "\n\n你可以调用工具直接查询用户配置的服务器："
+                "get_system_info（系统信息）、get_services（运行中的服务）、"
+                "get_pm2_processes（PM2 进程）。涉及服务器状态的问题优先用工具核实，不要凭猜测回答；"
+                "工具返回 JSON，回答时用清晰中文组织。启动/停止/重启 PM2 属于写操作，"
+                "告诉用户去「服务器助手」执行（那里有确认流程）。"
+            )
         items: list = [
             {"role": message["role"], "content": message["content"]}
             for message in _history_messages(history)
@@ -501,12 +526,14 @@ class AgentDesk:
         user_content = question
         tools = None
         workspace_root = None
+        if allow_server:
+            tools = to_chat_tool_schemas(read_only_only=True)
         if workspace:
             from .attachments import build_file_tree
 
             workspace_root = Path(workspace).expanduser()
             if workspace_root.is_dir():
-                tools = [READ_FILE_TOOL, WRITE_FILE_TOOL, EDIT_FILE_TOOL]
+                tools = (tools or []) + [READ_FILE_TOOL, WRITE_FILE_TOOL, EDIT_FILE_TOOL]
                 user_content = (
                     f"{question}\n\n---\n"
                     f"{build_file_tree(workspace_root)}\n"
@@ -531,7 +558,7 @@ class AgentDesk:
             for _ in range(CHAT_TOOL_ROUNDS):
                 result = self._completion(system_prompt, items, tools=tools, on_delta=on_delta, on_stage=on_stage)
                 answer = result["content"]
-                if not tools or not result["tool_calls"] or not workspace_root:
+                if not tools or not result["tool_calls"]:
                     break
                 items.append({"role": "tool_calls", "content": answer, "calls": result["tool_calls"]})
                 for call in result["tool_calls"]:
@@ -541,16 +568,31 @@ class AgentDesk:
                         arguments = {}
                     if not isinstance(arguments, dict):
                         arguments = {}
-                    if call["name"] == "read_file":
+                    if call["name"] == "get_system_info":
+                        if on_stage:
+                            on_stage("querying_server", "系统信息")
+                        items.append({"role": "tool_result", "call_id": call["id"],
+                                      "content": json.dumps(self.server.query(), ensure_ascii=False)})
+                    elif call["name"] == "get_services":
+                        if on_stage:
+                            on_stage("querying_server", "运行中的服务")
+                        items.append({"role": "tool_result", "call_id": call["id"],
+                                      "content": json.dumps(self.server.query_services(), ensure_ascii=False)})
+                    elif call["name"] == "get_pm2_processes":
+                        if on_stage:
+                            on_stage("querying_server", "PM2 进程")
+                        items.append({"role": "tool_result", "call_id": call["id"],
+                                      "content": json.dumps(self.server.query_pm2(), ensure_ascii=False)})
+                    elif call["name"] == "read_file" and workspace_root:
                         target_name = str(arguments.get("path", "")).strip() or "工作空间文件"
                         if on_stage:
                             on_stage("reading_file", target_name)
                         content = read_workspace_file(workspace_root, arguments.get("path"))
                         items.append({"role": "tool_result", "call_id": call["id"], "content": content})
-                    elif call["name"] == "write_file":
+                    elif call["name"] == "write_file" and workspace_root:
                         content = self._handle_write_file(arguments, items, workspace_root, trace)
                         items.append({"role": "tool_result", "call_id": call["id"], "content": content})
-                    elif call["name"] == "edit_file":
+                    elif call["name"] == "edit_file" and workspace_root:
                         content = self._handle_edit_file(arguments, items, workspace_root, trace)
                         items.append({"role": "tool_result", "call_id": call["id"], "content": content})
                     else:
@@ -596,7 +638,7 @@ class AgentDesk:
             decisions: list = []
             answer = ""
             for _ in range(SERVER_TOOL_ROUNDS):
-                result = self._completion(TURN_SYSTEM_PROMPT, items, tools=tools, on_delta=on_delta, on_stage=on_stage)
+                result = self._completion(f"{time_context()}\n\n{TURN_SYSTEM_PROMPT}", items, tools=tools, on_delta=on_delta, on_stage=on_stage)
                 answer = result["content"]
                 if not result["tool_calls"]:
                     break
